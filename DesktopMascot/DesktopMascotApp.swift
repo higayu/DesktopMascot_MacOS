@@ -15,5 +15,6 @@ struct DesktopMascotApp: App {
         }
         .windowStyle(.hiddenTitleBar)
         .windowResizability(.contentSize)
+        .defaultSize(width: 250, height: 250)
     }
 }

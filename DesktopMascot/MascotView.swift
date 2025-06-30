@@ -20,11 +20,14 @@ struct MascotView: View {
                 // パトカーモードではGIFアニメーションを使用
                 GIFView(gifName: viewModel.mascotImage)
                     .frame(width: 200, height: 200)
+                    .clipped(antialiased: false) // 画像が切れないようにする
             } else {
                 // ストップモードでは通常の画像を使用
                 Image(viewModel.mascotImage)
                     .resizable()
+                    .aspectRatio(contentMode: .fit) // アスペクト比を保持
                     .frame(width: 200, height: 200)
+                    .clipped(antialiased: false) // 画像が切れないようにする
                     .onAppear {
                         print("MascotView appeared with image: \(viewModel.mascotImage)")
                         // 画像が見つからない場合のフォールバック
@@ -82,6 +85,17 @@ struct MascotView: View {
             window.ignoresMouseEvents = false
             window.isMovableByWindowBackground = true
             window.acceptsMouseMovedEvents = true
+            
+            // ウィンドウサイズを画像が切れないように調整
+            let windowSize = NSSize(width: 250, height: 250)
+            let currentFrame = window.frame
+            let newFrame = NSRect(
+                x: currentFrame.origin.x,
+                y: currentFrame.origin.y,
+                width: windowSize.width,
+                height: windowSize.height
+            )
+            window.setFrame(newFrame, display: true)
         }
     }
 }

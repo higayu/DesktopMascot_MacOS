@@ -18,20 +18,21 @@ struct GIFView: NSViewRepresentable {
         imageView.imageFrameStyle = .none
         imageView.wantsLayer = true
         imageView.layer?.backgroundColor = NSColor.clear.cgColor
+        imageView.imageAlignment = .alignCenter // 画像を中央に配置
         
-        loadGif(imageView: imageView, name: gifName)
+        loadGif(imageView: imageView, name: gifName, coordinator: context.coordinator)
         return imageView
     }
 
     func updateNSView(_ nsView: NSImageView, context: Context) {
         // GIF名が変更された場合のみ再読み込み
         if let currentGif = context.coordinator.currentGifName, currentGif != gifName {
-            loadGif(imageView: nsView, name: gifName)
+            loadGif(imageView: nsView, name: gifName, coordinator: context.coordinator)
             context.coordinator.currentGifName = gifName
         }
     }
     
-    private func loadGif(imageView: NSImageView, name: String) {
+    private func loadGif(imageView: NSImageView, name: String, coordinator: Coordinator) {
         DispatchQueue.global(qos: .userInitiated).async {
             // ResourcesフォルダからGIFファイルを読み込み
             guard let bundleURL = Bundle.main.url(forResource: name, withExtension: "gif") else {
@@ -52,12 +53,7 @@ struct GIFView: NSViewRepresentable {
             }
             
             DispatchQueue.main.async {
-                if let animatedImage = NSImage.animatedImageWithGIFData(imageData) {
-                    imageView.image = animatedImage
-                } else {
-                    // GIFの読み込みに失敗した場合はデフォルト画像を表示
-                    imageView.image = NSImage(named: "main") ?? NSImage(named: "NSApplicationIcon")
-                }
+                coordinator.startGifAnimation(imageView: imageView, gifData: imageData)
             }
         }
     }
@@ -68,66 +64,82 @@ struct GIFView: NSViewRepresentable {
     
     class Coordinator {
         var currentGifName: String?
-    }
-}
-
-extension NSImageView {
-    func loadGif(name: String) {
-        DispatchQueue.global(qos: .userInitiated).async {
-            // ResourcesフォルダからGIFファイルを読み込み
-            guard let bundleURL = Bundle.main.url(forResource: name, withExtension: "gif") else {
-                print("GIF named \(name) not found in Resources folder")
+        private var animationTimer: Timer?
+        private var currentFrameIndex = 0
+        private var gifFrames: [NSImage] = []
+        private var frameDurations: [Double] = []
+        
+        func startGifAnimation(imageView: NSImageView, gifData: Data) {
+            // 既存のタイマーを停止
+            animationTimer?.invalidate()
+            animationTimer = nil
+            
+            // GIFデータを解析
+            guard let source = CGImageSourceCreateWithData(gifData as CFData, nil) else {
+                imageView.image = NSImage(named: "main") ?? NSImage(named: "NSApplicationIcon")
                 return
             }
-            guard let imageData = try? Data(contentsOf: bundleURL) else {
-                print("Cannot turn GIF named \(name) into data")
+            
+            let frameCount = CGImageSourceGetCount(source)
+            guard frameCount > 0 else {
+                imageView.image = NSImage(named: "main") ?? NSImage(named: "NSApplicationIcon")
                 return
             }
-            DispatchQueue.main.async {
-                self.image = NSImage.animatedImageWithGIFData(imageData) ?? NSImage(named: "main") ?? NSImage(named: "NSApplicationIcon")
-            }
-        }
-    }
-}
-
-extension NSImage {
-    static func animatedImageWithGIFData(_ data: Data) -> NSImage? {
-        guard let source = CGImageSourceCreateWithData(data as CFData, nil) else {
-            return nil
-        }
-
-        let count = CGImageSourceGetCount(source)
-        guard count > 0 else { return nil }
-        
-        // 最初のフレームを取得
-        if let cgImage = CGImageSourceCreateImageAtIndex(source, 0, nil) {
-            let nsImage = NSImage(cgImage: cgImage, size: NSSize(width: cgImage.width, height: cgImage.height))
             
-            // アニメーション情報を設定（簡易版）
-            if count > 1 {
-                // 複数フレームがある場合は、最初のフレームを表示
-                // 完全なGIFアニメーション実装は別途必要
-                print("GIF has \(count) frames, showing first frame")
+            // フレームとデュレーションを取得
+            gifFrames.removeAll()
+            frameDurations.removeAll()
+            
+            for i in 0..<frameCount {
+                if let cgImage = CGImageSourceCreateImageAtIndex(source, i, nil) {
+                    let nsImage = NSImage(cgImage: cgImage, size: NSSize(width: cgImage.width, height: cgImage.height))
+                    gifFrames.append(nsImage)
+                    
+                    let duration = frameDurationAtIndex(i, source: source)
+                    frameDurations.append(duration)
+                }
             }
             
-            return nsImage
-        }
-        
-        return nil
-    }
-
-    static func frameDurationAtIndex(_ index: Int, source: CGImageSource) -> Double {
-        var frameDuration = 0.1
-        let cfFrameProperties = CGImageSourceCopyPropertiesAtIndex(source, index, nil)
-        if let frameProperties = cfFrameProperties as? [String: Any],
-           let gifProperties = frameProperties[kCGImagePropertyGIFDictionary as String] as? [String: Any] {
-            if let delayTime = gifProperties[kCGImagePropertyGIFUnclampedDelayTime as String] as? Double {
-                frameDuration = delayTime
-            } else if let delayTime = gifProperties[kCGImagePropertyGIFDelayTime as String] as? Double {
-                frameDuration = delayTime
+            if gifFrames.isEmpty {
+                imageView.image = NSImage(named: "main") ?? NSImage(named: "NSApplicationIcon")
+                return
+            }
+            
+            // 最初のフレームを表示
+            currentFrameIndex = 0
+            imageView.image = gifFrames[0]
+            
+            // アニメーションタイマーを開始
+            if gifFrames.count > 1 {
+                startAnimationTimer(imageView: imageView)
             }
         }
-        return frameDuration
+        
+        private func startAnimationTimer(imageView: NSImageView) {
+            animationTimer = Timer.scheduledTimer(withTimeInterval: 0.1, repeats: true) { [weak self] _ in
+                guard let self = self else { return }
+                
+                self.currentFrameIndex = (self.currentFrameIndex + 1) % self.gifFrames.count
+                imageView.image = self.gifFrames[self.currentFrameIndex]
+            }
+        }
+        
+        private func frameDurationAtIndex(_ index: Int, source: CGImageSource) -> Double {
+            var frameDuration = 0.1
+            let cfFrameProperties = CGImageSourceCopyPropertiesAtIndex(source, index, nil)
+            if let frameProperties = cfFrameProperties as? [String: Any],
+               let gifProperties = frameProperties[kCGImagePropertyGIFDictionary as String] as? [String: Any] {
+                if let delayTime = gifProperties[kCGImagePropertyGIFUnclampedDelayTime as String] as? Double {
+                    frameDuration = delayTime
+                } else if let delayTime = gifProperties[kCGImagePropertyGIFDelayTime as String] as? Double {
+                    frameDuration = delayTime
+                }
+            }
+            return frameDuration
+        }
+        
+        deinit {
+            animationTimer?.invalidate()
+        }
     }
-}
-
+} 
