@@ -35,7 +35,7 @@ struct MascotView: View {
                     }
             }
         }
-        .position(viewModel.position)
+        .position(viewModel.mascotPosition) // マスコットはウィンドウ内で固定位置
         .onTapGesture {
             viewModel.handleTap()
         }
@@ -45,7 +45,13 @@ struct MascotView: View {
         .gesture(
             DragGesture()
                 .onChanged { value in
-                    viewModel.position = value.location
+                    // ウィンドウ全体を移動
+                    let newWindowPosition = CGPoint(
+                        x: viewModel.windowPosition.x + value.translation.width,
+                        y: viewModel.windowPosition.y + value.translation.height
+                    )
+                    viewModel.windowPosition = newWindowPosition
+                    viewModel.updateWindowPosition()
                 }
         )
         .background(Color.clear)

@@ -12,7 +12,8 @@ import AppKit
 class MascotViewModel: ObservableObject {
     @Published var mode: UsamaruMode = .stop
     @Published var mascotImage = "main"
-    @Published var position = CGPoint(x: 100, y: 300)
+    @Published var windowPosition = CGPoint(x: 100, y: 300) // ウィンドウの位置
+    @Published var mascotPosition = CGPoint(x: 100, y: 100) // マスコットの位置（ウィンドウ内で固定）
     @Published var direction = 1 // 1=右, -1=左
     @Published var speedX: CGFloat = 3 // 速度を調整
     @Published var centerY: CGFloat = 300
@@ -84,12 +85,12 @@ class MascotViewModel: ObservableObject {
     }
     
     private func patokaAction() {
-        // パトカーの移動ロジック
-        position.x += speedX * CGFloat(direction)
+        // ウィンドウの移動ロジック
+        windowPosition.x += speedX * CGFloat(direction)
         
         // 画面端で反転
         let windowWidth: CGFloat = 200
-        if position.x > screenBounds.maxX - windowWidth/2 || position.x < screenBounds.minX + windowWidth/2 {
+        if windowPosition.x > screenBounds.maxX - windowWidth || windowPosition.x < screenBounds.minX {
             direction *= -1
             // 画像を切り替え（ResourcesフォルダのGIFファイルが存在するかチェック）
             if direction == 1 {
@@ -114,7 +115,18 @@ class MascotViewModel: ObservableObject {
         // 浮き沈み
         waveCounter += 0.2
         let waveOffset = sin(waveCounter) * waveAmplitude
-        position.y = centerY + waveOffset
+        windowPosition.y = centerY + waveOffset
+        
+        // ウィンドウの位置を実際に更新
+        updateWindowPosition()
+    }
+    
+    func updateWindowPosition() {
+        DispatchQueue.main.async {
+            if let window = NSApplication.shared.windows.first {
+                window.setFrameOrigin(self.windowPosition)
+            }
+        }
     }
     
     func handleTap() {
@@ -162,7 +174,7 @@ class MascotViewModel: ObservableObject {
             print("patoka_r.gif not found, using main image as fallback")
         }
         direction = 1
-        centerY = position.y
+        centerY = windowPosition.y
         updateScreenBounds()
     }
 } 
