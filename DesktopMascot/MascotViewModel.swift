@@ -92,24 +92,33 @@ class MascotViewModel: ObservableObject {
         let windowWidth: CGFloat = 200
         if windowPosition.x > screenBounds.maxX - windowWidth || windowPosition.x < screenBounds.minX {
             direction *= -1
+            print("Direction changed to: \(direction == 1 ? "right" : "left")")
+            
             // 画像を切り替え（ResourcesフォルダのGIFファイルが存在するかチェック）
             if direction == 1 {
                 // 右向き
                 if gifExistsInResources("patoka_r") {
                     mascotImage = "patoka_r"
+                    print("Switched to patoka_r.gif")
                 } else {
-                    // GIFファイルが存在しない場合は、パトカーモードを維持
-                    print("patoka_r.gif not found, keeping current image")
+                    // GIFファイルが存在しない場合は、デフォルト画像を使用
+                    mascotImage = "main"
+                    print("patoka_r.gif not found, using main image")
                 }
             } else {
                 // 左向き
                 if gifExistsInResources("patoka_l") {
                     mascotImage = "patoka_l"
+                    print("Switched to patoka_l.gif")
                 } else {
-                    // GIFファイルが存在しない場合は、パトカーモードを維持
-                    print("patoka_l.gif not found, keeping current image")
+                    // GIFファイルが存在しない場合は、デフォルト画像を使用
+                    mascotImage = "main"
+                    print("patoka_l.gif not found, using main image")
                 }
             }
+            
+            // UIの更新を強制
+            objectWillChange.send()
         }
         
         // 浮き沈み

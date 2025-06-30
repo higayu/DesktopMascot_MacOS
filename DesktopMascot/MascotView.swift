@@ -19,6 +19,7 @@ struct MascotView: View {
             if viewModel.mode == .patoka {
                 // パトカーモードではGIFアニメーションを使用
                 GIFView(gifName: viewModel.mascotImage)
+                    .id(viewModel.mascotImage) // 画像名が変更された時にGIFViewを再作成
                     .frame(width: 200, height: 200)
                     .clipped(antialiased: false) // 画像が切れないようにする
             } else {

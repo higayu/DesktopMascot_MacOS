@@ -25,8 +25,13 @@ struct GIFView: NSViewRepresentable {
     }
 
     func updateNSView(_ nsView: NSImageView, context: Context) {
-        // GIF名が変更された場合のみ再読み込み
-        if let currentGif = context.coordinator.currentGifName, currentGif != gifName {
+        // 初回の設定またはGIF名が変更された場合に再読み込み
+        if context.coordinator.currentGifName == nil {
+            print("Initial GIF setup for: \(gifName)")
+            loadGif(imageView: nsView, name: gifName, coordinator: context.coordinator)
+            context.coordinator.currentGifName = gifName
+        } else if let currentGif = context.coordinator.currentGifName, currentGif != gifName {
+            print("GIF name changed from \(currentGif) to \(gifName)")
             loadGif(imageView: nsView, name: gifName, coordinator: context.coordinator)
             context.coordinator.currentGifName = gifName
         }
@@ -59,7 +64,9 @@ struct GIFView: NSViewRepresentable {
     }
     
     func makeCoordinator() -> Coordinator {
-        Coordinator()
+        let coordinator = Coordinator()
+        coordinator.currentGifName = gifName
+        return coordinator
     }
     
     class Coordinator {
@@ -70,21 +77,27 @@ struct GIFView: NSViewRepresentable {
         private var frameDurations: [Double] = []
         
         func startGifAnimation(imageView: NSImageView, gifData: Data) {
+            print("Starting GIF animation for \(currentGifName ?? "unknown")")
+            
             // 既存のタイマーを停止
             animationTimer?.invalidate()
             animationTimer = nil
             
             // GIFデータを解析
             guard let source = CGImageSourceCreateWithData(gifData as CFData, nil) else {
+                print("Failed to create CGImageSource from GIF data")
                 imageView.image = NSImage(named: "main") ?? NSImage(named: "NSApplicationIcon")
                 return
             }
             
             let frameCount = CGImageSourceGetCount(source)
             guard frameCount > 0 else {
+                print("No frames found in GIF")
                 imageView.image = NSImage(named: "main") ?? NSImage(named: "NSApplicationIcon")
                 return
             }
+            
+            print("GIF has \(frameCount) frames")
             
             // フレームとデュレーションを取得
             gifFrames.removeAll()
@@ -101,6 +114,7 @@ struct GIFView: NSViewRepresentable {
             }
             
             if gifFrames.isEmpty {
+                print("No frames were extracted from GIF")
                 imageView.image = NSImage(named: "main") ?? NSImage(named: "NSApplicationIcon")
                 return
             }
@@ -108,10 +122,14 @@ struct GIFView: NSViewRepresentable {
             // 最初のフレームを表示
             currentFrameIndex = 0
             imageView.image = gifFrames[0]
+            print("Displaying first frame of GIF")
             
             // アニメーションタイマーを開始
             if gifFrames.count > 1 {
                 startAnimationTimer(imageView: imageView)
+                print("Started animation timer with \(gifFrames.count) frames")
+            } else {
+                print("Single frame GIF, no animation needed")
             }
         }
         
