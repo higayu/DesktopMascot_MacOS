@@ -14,7 +14,7 @@ struct GIFView: NSViewRepresentable {
 
     func makeNSView(context: Context) -> NSImageView {
         let imageView = NSImageView()
-        imageView.imageScaling = .scaleProportionallyUpOrDown
+        imageView.imageScaling = .scaleProportionallyDown
         imageView.imageFrameStyle = .none
         imageView.wantsLayer = true
         imageView.layer?.backgroundColor = NSColor.clear.cgColor
@@ -99,13 +99,31 @@ struct GIFView: NSViewRepresentable {
             
             print("GIF has \(frameCount) frames")
             
+            // 最初のフレームからサイズを取得
+            guard let firstCGImage = CGImageSourceCreateImageAtIndex(source, 0, nil) else {
+                print("Failed to get first frame")
+                imageView.image = NSImage(named: "main") ?? NSImage(named: "NSApplicationIcon")
+                return
+            }
+            
+            let originalSize = NSSize(width: firstCGImage.width, height: firstCGImage.height)
+            print("Original GIF size: \(originalSize)")
+            
             // フレームとデュレーションを取得
             gifFrames.removeAll()
             frameDurations.removeAll()
             
             for i in 0..<frameCount {
                 if let cgImage = CGImageSourceCreateImageAtIndex(source, i, nil) {
-                    let nsImage = NSImage(cgImage: cgImage, size: NSSize(width: cgImage.width, height: cgImage.height))
+                    // 画像サイズを200x200に制限してスケーリング
+                    let maxSize: CGFloat = 200
+                    let scale = min(maxSize / originalSize.width, maxSize / originalSize.height)
+                    let scaledSize = NSSize(
+                        width: originalSize.width * scale,
+                        height: originalSize.height * scale
+                    )
+                    
+                    let nsImage = NSImage(cgImage: cgImage, size: scaledSize)
                     gifFrames.append(nsImage)
                     
                     let duration = frameDurationAtIndex(i, source: source)
@@ -122,7 +140,7 @@ struct GIFView: NSViewRepresentable {
             // 最初のフレームを表示
             currentFrameIndex = 0
             imageView.image = gifFrames[0]
-            print("Displaying first frame of GIF")
+            print("Displaying first frame of GIF with size: \(gifFrames[0].size)")
             
             // アニメーションタイマーを開始
             if gifFrames.count > 1 {

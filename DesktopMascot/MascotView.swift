@@ -20,7 +20,7 @@ struct MascotView: View {
                 // パトカーモードではGIFアニメーションを使用
                 GIFView(gifName: viewModel.mascotImage)
                     .id(viewModel.mascotImage) // 画像名が変更された時にGIFViewを再作成
-                    .frame(width: 200, height: 200)
+                    .frame(maxWidth: 200, maxHeight: 200) // 最大サイズを制限
                     .clipped(antialiased: false) // 画像が切れないようにする
             } else {
                 // ストップモードでは通常の画像を使用
